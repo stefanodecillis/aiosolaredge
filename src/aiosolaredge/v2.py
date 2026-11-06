@@ -7,6 +7,7 @@ refresh/rotation persistence; credentials never appear in URLs or errors.
 
 from __future__ import annotations
 
+import asyncio
 import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -161,7 +162,8 @@ class SolarEdgeV2:
                         "SolarEdge request failed", http_status=response.status
                     )
                 data = await response.json()
-        except (ClientError, TimeoutError):
+        # asyncio.TimeoutError is only an alias of TimeoutError from Python 3.11.
+        except (ClientError, TimeoutError, asyncio.TimeoutError):
             raise SolarEdgeV2Error("Connection failed", http_status=status) from None
         except ValueError:
             raise InvalidResponseError("Invalid JSON response") from None

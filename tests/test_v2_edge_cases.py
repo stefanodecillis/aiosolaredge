@@ -4,6 +4,7 @@ Edge-case contracts for quota metadata, DST windows and numeric bounds.
 All responses are synthetic.
 """
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -35,6 +36,17 @@ class Response:
         return self.payload
 
 
+class TimedOut(Response):
+    """A total ClientTimeout expiring while the body is read."""
+
+    def __init__(self, error):
+        super().__init__()
+        self.error = error
+
+    async def json(self):
+        raise self.error
+
+
 class Session:
     """Capture the actual client wire arguments."""
 
@@ -50,6 +62,21 @@ class Session:
 def api(response):
     session = Session(response)
     return v2.SolarEdgeV2(session, AsyncMock(return_value="synthetic-access")), session
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(asyncio.TimeoutError, id="asyncio"),
+        pytest.param(TimeoutError, id="builtin"),
+    ],
+)
+async def test_total_timeout_is_connection_error(error):
+    """A total timeout raises asyncio.TimeoutError, not TimeoutError, on 3.10."""
+    client, _ = api(TimedOut(error()))
+    with pytest.raises(v2.SolarEdgeV2Error, match="Connection failed"):
+        await client.site("123")
 
 
 @pytest.mark.asyncio

@@ -11,7 +11,7 @@ from aiosolaredge.v2 import InvalidResponseError
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("field", ["lifetimeEnergyCharged", "lifetimeEnergyDischarged"])
-async def test_interior_counter_reset(field):
+async def test_interior_counter_reset(field, monkeypatch):
     now = datetime(2026, 10, 22, 12, tzinfo=timezone.utc)
 
     def samples(values):
@@ -31,16 +31,18 @@ async def test_interior_counter_reset(field):
     }
     battery[field] = samples([100, 10, 130])
     api = BasicMonitoring(None, AsyncMock(return_value="synthetic"))
-    api._get = AsyncMock(return_value={"batteries": [battery]})
+    monkeypatch.setattr(api, "_get", AsyncMock(return_value={"batteries": [battery]}))
     with pytest.raises(InvalidResponseError):
         await api.storage_daily("123", now, "UTC", ["B1"])
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("serial", [None, [], {}, "", " ", 123])
-async def test_malformed_unknown_storage_identity(serial):
+async def test_malformed_unknown_storage_identity(serial, monkeypatch):
     api = BasicMonitoring(None, AsyncMock(return_value="synthetic"))
-    api._get = AsyncMock(return_value={"batteries": [{"serialNumber": serial}]})
+    monkeypatch.setattr(
+        api, "_get", AsyncMock(return_value={"batteries": [{"serialNumber": serial}]})
+    )
     with pytest.raises(InvalidResponseError, match="Invalid battery identity"):
         await api.storage_daily(
             "123", datetime(2026, 10, 22, 12, tzinfo=timezone.utc), "UTC", ["B1"]
@@ -48,11 +50,13 @@ async def test_malformed_unknown_storage_identity(serial):
 
 
 @pytest.mark.asyncio
-async def test_typed_inventory_drift_is_not_malformed_identity():
+async def test_typed_inventory_drift_is_not_malformed_identity(monkeypatch):
     from aiosolaredge.monitoring import StorageMembershipChanged
 
     api = BasicMonitoring(None, AsyncMock(return_value="synthetic"))
-    api._get = AsyncMock(return_value={"batteries": [{"serialNumber": "B2"}]})
+    monkeypatch.setattr(
+        api, "_get", AsyncMock(return_value={"batteries": [{"serialNumber": "B2"}]})
+    )
     with pytest.raises(StorageMembershipChanged):
         await api.storage_daily(
             "123", datetime(2026, 10, 22, 12, tzinfo=timezone.utc), "UTC", ["B1"]
