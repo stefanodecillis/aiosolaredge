@@ -55,7 +55,7 @@ async def test_lifetime_native_counter():
     ],
 )
 async def test_errors_are_bounded_and_redacted(status, exception):
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(raise_for_status=True) as session:
         api = SolarEdgeV2(session, AsyncMock(return_value="synthetic-access"))
         async with aiointercept(mock_external_urls=True) as mock:
             mock.get(

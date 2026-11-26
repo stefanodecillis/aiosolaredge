@@ -128,6 +128,7 @@ class SolarEdgeV2:
                 params=params,
                 timeout=ClientTimeout(total=30),
                 allow_redirects=False,
+                raise_for_status=False,
             ) as response:
                 status = response.status
                 if response.status == 401:
