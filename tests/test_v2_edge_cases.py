@@ -80,6 +80,14 @@ async def test_total_timeout_is_connection_error(error):
 
 
 @pytest.mark.asyncio
+async def test_request_disables_session_status_handling():
+    client, session = api(Response(status=401))
+    with pytest.raises(v2.AuthenticationError):
+        await client.site("123")
+    assert session.kwargs["raise_for_status"] is False
+
+
+@pytest.mark.asyncio
 async def test_429_retains_distinguishing_quota_metadata():
     errors = []
     for headers in [

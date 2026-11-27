@@ -10,6 +10,27 @@ from aiosolaredge.v2 import InvalidResponseError
 
 
 @pytest.mark.asyncio
+async def test_inventory_rejects_unhashable_meter_type(monkeypatch):
+    api = BasicMonitoring(None, AsyncMock(return_value="synthetic"))
+    monkeypatch.setattr(
+        api,
+        "_get",
+        AsyncMock(
+            return_value=[
+                {
+                    "serialNumber": "M1",
+                    "type": "METER",
+                    "meterType": [],
+                    "form": "physical",
+                }
+            ]
+        ),
+    )
+    with pytest.raises(InvalidResponseError, match="Invalid inventory device"):
+        await api.inventory("123")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("field", ["lifetimeEnergyCharged", "lifetimeEnergyDischarged"])
 async def test_interior_counter_reset(field, monkeypatch):
     now = datetime(2026, 10, 22, 12, tzinfo=timezone.utc)
@@ -61,3 +82,23 @@ async def test_typed_inventory_drift_is_not_malformed_identity(monkeypatch):
         await api.storage_daily(
             "123", datetime(2026, 10, 22, 12, tzinfo=timezone.utc), "UTC", ["B1"]
         )
+
+
+@pytest.mark.asyncio
+async def test_storage_total_deduplicates_requested_serials(monkeypatch):
+    now = datetime(2026, 10, 22, 12, tzinfo=timezone.utc)
+    samples = [
+        {"timestamp": (now - timedelta(minutes=15)).isoformat(), "value": 1},
+        {"timestamp": now.isoformat(), "value": 3},
+    ]
+    battery = {
+        "serialNumber": "B1",
+        "unit": "KWH",
+        "lifetimeEnergyCharged": samples,
+        "lifetimeEnergyDischarged": samples,
+    }
+    api = BasicMonitoring(None, AsyncMock(return_value="synthetic"))
+    monkeypatch.setattr(api, "_get", AsyncMock(return_value={"batteries": [battery]}))
+    result = await api.storage_daily("123", now, "UTC", ["B1", "B1"])
+    assert result["storage_charge_energy"].value == 2000
+    assert result["storage_discharge_energy"].value == 2000

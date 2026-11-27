@@ -116,13 +116,18 @@ class BasicMonitoring(SolarEdgeV2):
             kind = item.get("type")
             serial = item.get("serialNumber")
             virtual_meter = kind == "METER" and item.get("form") == "virtual"
+            meter_type = item.get("meterType")
+            if kind == "METER" and not (
+                isinstance(meter_type, str) and meter_type.strip()
+            ):
+                raise InvalidResponseError("Invalid inventory device")
             if not (isinstance(serial, str) and serial) and not (
                 virtual_meter and serial is None
             ):
                 raise InvalidResponseError("Invalid inventory device")
             identity: tuple[Any, ...] = (kind, serial)
             if kind == "METER":
-                identity += (item.get("meterType"),)
+                identity += (meter_type,)
             if kind not in INVENTORY.values() or identity in seen:
                 raise InvalidResponseError("Unexpected or duplicate inventory device")
             seen.add(identity)
@@ -159,6 +164,7 @@ class BasicMonitoring(SolarEdgeV2):
         batteries = data.get("batteries")
         if not isinstance(batteries, list):
             raise InvalidResponseError("Missing battery counters")
+        serials = list(dict.fromkeys(serials))
         result = {}
         seen = set()
         for battery in batteries:
